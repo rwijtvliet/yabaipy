@@ -1,35 +1,99 @@
+"""Module to manipulate displays."""
+
 from __future__ import annotations
-from .shared import run_command, none_means_current
-from typing import Any, Callable, List, Dict, Optional
+from typing import Any, List, Dict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
+from .shared import run_command
 import json
+from .spaces import Space
 
 
-def get_all() -> List[Display]:
-    """Get info on all displays."""
-    displays = json.loads(run_command("yabai -m query --displays"))
-    return [Display.from_dict(display) for display in displays]
+def verify_display_selector(display_sel: str) -> Any:
+    """Verify and adjust display selector to avoid inadvertently selecting incorrect display."""
+    if display_sel == "":
+        raise ValueError(
+            "display selector cannot be the empty string (use None to select current display)."
+        )
+    if display_sel is None:
+        display_sel = ""
+    return display_sel
 
 
-@none_means_current
-def get(display_sel: Optional[Any] = None) -> Display:
-    """Get info on display ``display_sel`` (if none provided: current display)."""
-    display = json.loads(
-        run_command(f"yabai -m query --displays --display {display_sel}")
-    )
-    return Display.from_dict(display)
+def dictionary_from_display_sel(display_sel: str) -> Dict[str, Any]:
+    display_sel = verify_display_selector(display_sel)
+    return json.loads(run_command(f"yabai -m query --displays --display {display_sel}"))
+
+
+def dictionary_from_uuid(uuid: str) -> Dict[str, Any]:
+    for dic in dictionaries():
+        if dic["uuid"] == uuid:
+            return dic
+    raise ValueError(f"Cannot find display with uuid {uuid}.")
+
+
+def dictionaries() -> List[Dict[str, Any]]:
+    return json.loads(run_command("yabai -m query --displays"))
 
 
 @dataclass_json
-@dataclass
-class Display:
+@dataclass(frozen=True)
+class Props:
+    """Class to hold the properties of a display. The properties are queried and stored
+    at the moment of creation, and not updated afterwards."""
+
     id_: int = field(metadata=config(field_name="id"))
     uuid: str
     index: int
     frame: Dict[str, float]
-    spaces: List[int]
+    spaces: List[Space]
 
-    # def focus(self) -> None:
-    #     """Focus the display."""
-    #     run_command(f"yabai -m display --focus {self.label}")
+    @classmethod
+    def from_display_sel(cls, display_sel: Any) -> Props:
+        return cls.from_dict(dictionary_from_display_sel(display_sel))
+
+    @classmethod
+    def from_uuid(cls, uuid: str) -> Props:
+        return cls.from_dict(dictionary_from_uuid(uuid))
+
+
+class Display:
+    """Class to manipulate displays. The properties are accessible via the `.props()`
+    method. This information is fetched whenever called, so you may want to store it in
+    a temporary variable (if the relevant properties do not change before they are)
+    needed.
+
+    Internally, the uuid is stored, so that the other methods of this class (which is
+    only .focus()) can always be called, even if the arrangement index (or any other
+    property) has changed. (This is done by using the uuid to find the display's index
+    every time it's needed.
+
+    Parameters
+    ----------
+    display_sel : str, optional (default: None)
+        arrangement index | prev | next | first | last | recent | mouse | north | east
+        | west | south
+        Use None for current display.
+    """
+
+    @classmethod
+    def get_all(cls) -> List[Display]:
+        """Create Display for all displays."""
+        return [cls(dic["index"]) for dic in dictionaries()]
+
+    def __init__(self, display_sel: str = None):
+        data = Props.from_display_sel(display_sel)
+        self._uuid: str = data.uuid  # cache uuid
+
+    @property
+    def display_sel(self) -> str:
+        """Currently-correct (unique) display selector with minimal queries."""
+        return dictionary_from_uuid(self._uuid)["index"]
+
+    def props(self) -> Props:
+        """Query yabai API and return the current space properties."""
+        return Props.from_uuid(self._uuid)
+
+    def focus(self) -> None:
+        """Focus display."""
+        run_command(f"yabai -m display --focus {self.display_sel}")

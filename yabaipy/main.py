@@ -3,7 +3,8 @@
 
 from dataclasses import dataclass
 from typing import List, Any
-from . import spaces, windows, displays
+from .spaces import Space
+from .displays import Display
 
 
 @dataclass
@@ -38,6 +39,10 @@ def _orderpos(label: str) -> int:
 def _space_labels_on_display(display_sel: Any) -> List[str]:
     space_idxs = displays.get(display_sel).spaces
     return [spaces.get(space_idx).label for space_idx in space_idxs]
+
+
+def force_correct_order(display_sel) -> None:
+    spaces = Display.from_display_sel(display_sel).get_spaces()
 
 
 def move_correct_order(display_sel: Any) -> None:
