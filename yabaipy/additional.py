@@ -1,14 +1,19 @@
 """Additional functionality."""
-from dataclasses import dataclass
+
 from typing import Any, Iterable
 from .spaces import Space
 from .displays import Display
-from .windows import Window
 
 
-def send_to_display_keep_order(
-    space_sel: str, display_sel: str, space_order: Iterable[str]
-) -> None:
+labelorder: Iterable[str] = []
+
+
+def set_labelorder(order: Iterable[str]) -> None:
+    global labelorder
+    labelorder = order
+
+
+def send_to_display_keep_order(space_sel: str, display_sel: str) -> None:
     """Send space ``space_sel`` to display ``display_sel`` while keeping the correct
     space order."""
     sp = Space(space_sel)
@@ -47,8 +52,8 @@ def send_to_display_keep_order(
 def _orderpos(label: str) -> int:
     """Return the position of the label in the predefined/wanted space order.
     (Return -1 if label not found.)"""
-    for i, space_def in enumerate(SPACES_DEFS):
-        if space_def.label == label:
+    for i, label_avail in enumerate(labelorder):
+        if label_avail == label:
             return i
     return -1
 
@@ -96,9 +101,9 @@ def sort_spaces_on_display(display_sel: Any) -> None:
     sps = [Space(space_sel) for space_sel in space_idxs]
     # Find wanted order.
     sps_in_order = []
-    for space_def in SPACES_DEFS:
+    for label_sought in labelorder:
         for sp in sps:
-            if sp.label == space_def.label:
+            if sp.label == label_sought:
                 sps_in_order.append(sp)
                 continue
     # Apply order.
@@ -113,21 +118,3 @@ def sort_spaces_on_displays() -> None:
     """Sort spaces on all displays."""
     for display in Display.get_all():
         sort_spaces_on_display(display.index)
-
-
-# Set-up spaces as wanted.
-
-# Ensure each space exists (checking the label).
-
-# Per monitor, put spaces in correct order.
-
-# If >1 display, move space 7,8,9 to secondary monitor.
-
-# Delete any surplus spaces.
-
-# Set correct background color
-
-
-# Add rules to ensure spaces remain in correct order.
-# TODO: when moving space to other display.
-# TODO: when a display is added/removed.
