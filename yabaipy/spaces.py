@@ -6,14 +6,15 @@
 # - The mission-control index of a space changes if space is moved.
 # - The uuid of a space IS constant, but cannot be easily be used to select a space.
 #
-# Handling:
-# - Use mission-control index to specify a space to yabai.
-# - Update space information to find correct mission-control index whenever calling yabai.
-
-# Use cases:
+# Specifying a space to yabai:
+# - If the space has a (non-emptystring) label, use that.
+# - Otherwise, use the uuid to find the mission-control index, and use that.
 #
-# Initial setup:
-# . Several spaces may exist without label; must be able to be labeled.
+# Consequences:
+# - The label, if not the emptystring, must be unique. This is assumed to be true, and
+#   enforced for new labels when using the Space.set_label() method.
+# - The label is stored in the Space instance, and must be updated when the space is
+#   given a new label. This is done automatically when using the Space.set_label() method.
 
 from __future__ import annotations
 from typing import Any, List, Dict
@@ -21,7 +22,7 @@ from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
 from .shared import run_command
 import json
-from .displays import Display
+from . import displays, windows
 
 
 FORBIDDEN_LABELS = ["prev", "next", "first", "last", "recent", "mouse"]
@@ -65,6 +66,11 @@ def dictionary_from_uuid(uuid: str) -> Dict[str, Any]:
 
 def dictionaries() -> List[Dict[str, Any]]:
     return json.loads(run_command("yabai -m query --spaces"))
+
+
+def get_all_spaces() -> List[Space]:
+    """Create Space for all spaces."""
+    return [Space(dic["index"]) for dic in dictionaries()]
 
 
 @dataclass_json
@@ -118,15 +124,13 @@ class Space:
         Use None for current space.
     """
 
-    @classmethod
-    def get_all(cls) -> List[Space]:
-        """Create Space for all spaces."""
-        return [cls(dic["index"]) for dic in dictionaries()]
-
     def __init__(self, space_sel: str = None):
         data = Props.from_space_sel(space_sel)
         self._label: str = data.label  # cache label
-        self._uud: str = data.uuid  # for backup: cache uuid
+        self._uuid: str = data.uuid  # for backup: cache uuid
+
+    label: str = property(lambda self: self._label)
+    uuid: str = property(lambda self: self._uuid)
 
     @property
     def space_sel(self) -> str:
@@ -139,9 +143,34 @@ class Space:
         # Otherwise, use uuid to find index (slower)
         return dictionary_from_uuid(self._uuid)["index"]
 
+    # ---
+
     def props(self) -> Props:
         """Query yabai API and return the current space properties."""
         return Props.from_space_sel(self.space_sel)
+
+    # ---
+
+    def __repr__(self) -> str:
+        return f"Space object with uuid '{self._uuid}' and label '{self._label}'."
+
+    def __eq__(self, other: Any) -> bool:
+        return type(self) is type(other) and self.uuid == other.uuid
+
+    # ---
+
+    def get_display(self) -> displays.Display:
+        """Display of the space."""
+        display_idx = self.props().display
+        return displays.Display(display_idx)
+
+    def get_windows(self) -> List[windows.Window]:
+        """Windows of the space."""
+        space_idx = self.props().index
+        wis = windows.get_all_windows()
+        return [wi for wi in wis if wi.props().space == space_idx]
+
+    # ---
 
     def focus(self) -> None:
         """Focus space."""
@@ -156,7 +185,7 @@ class Space:
         display_sel = self.props().display
         run_command(f"yabai -m space --create {self.space_sel}")
         # new space is last one in this display; get mission-control index
-        new_space_sel = Display(display_sel).spaces[-1]
+        new_space_sel = displays.Display(display_sel).spaces[-1]
         return Space(new_space_sel)
 
     def destroy(self) -> None:
@@ -164,20 +193,24 @@ class Space:
         run_command(f"yabai -m space --destroy {self.space_sel}")
         self._uuid = None
 
-    def move_to_other(self, space_sel: str) -> None:
-        """Move space to position of space ``space_sel`` (must be on same display)."""
+    def move_to(self, space_sel: str) -> None:
+        """Move space to position of space ``space_sel`` (must be on the same display)."""
         try:
             run_command(f"yabai -m space {self.space_sel} --move {space_sel}")
         except ValueError as e:
-            if "cannot move space to itself" not in e.args[0]:
+            if "cannot move space to itself" in e.args[0]:
+                pass  # no move necessary
+            else:
                 raise e
 
-    def swap_with_other(self, space_sel: str) -> None:
+    def swap_with(self, space_sel: str) -> None:
         """Swap space with space ``space_sel`` (must be on the same display)."""
         try:
             run_command(f"yabai -m space {self.space_sel} --swap {space_sel}")
         except ValueError as e:
-            if "cannot swap space with itself" not in e.args[0]:
+            if "cannot swap space with itself" in e.args[0]:
+                pass  # no move necessary
+            else:
                 raise e
 
     def send_to_display(self, display_sel: str) -> None:
@@ -185,29 +218,32 @@ class Space:
         try:
             run_command(f"yabai -m space {self.space_sel} --display {display_sel}")
         except ValueError as e:
-            if "already located on the given display" not in e.args[0]:
+            if "already located on the given display" in e.args[0]:
+                pass
+            else:
                 raise e
 
     def balance(self, axis: str = "xy") -> None:
         """Adjust split ratios on space so that windows along given axis occupy same distance.
-        Parameter ``axis``: {'x', 'y', 'xy'}."""
+        Parameter ``axis`` is one of {'x', 'y', 'xy'}."""
         if "x" in axis and "y" in axis:
             arg = ""
         elif "x" in axis:
             arg = "x-axis"
         elif "y" in axis:
             arg = "y-axis"
-        else:  # 'x' not in axis and 'y' not in axis:
+        else:
             raise ValueError("Parameter ``axis`` must contain 'x', 'y', or both.")
         run_command(f"yabai -m space {self.space_sel} --balance {arg}")
 
     def mirror(self, axis: str = "x") -> None:
-        """Flip the windows on space along given axis. Parameter ``axis``: {'x', 'y'}."""
+        """Flip the windows on space along given axis. Parameter ``axis`` is one of
+        {'x', 'y'}."""
         if axis == "x":
             arg = "x-axis"
         elif axis == "y":
             arg = "y-axis"
-        else:  # 'x' not in axis and 'y' not in axis:
+        else:
             raise ValueError("Parameter ``axis`` must be 'x' or 'y'.")
         run_command(f"yabai -m space {self.space_sel} --mirror {arg}")
 
@@ -221,24 +257,25 @@ class Space:
     def set_padding(
         self, relabs: str, top: int, bottom: int, left: int, right: int
     ) -> None:
-        """Set padding around space. Parameter ``relabs``: one of {'rel', 'abs'}.
+        """Set padding around space. If ``relabs``=='abs', the other values are the new
+        padding in pixels. If ``relabs``=='rel', they are the change in the padding.
         Parameters ``top``, ``bottom``, ``left``, ``right``: padding on resp. side."""
         run_command(
             f"yabai -m space {self.space_sel} --padding {relabs}:{top}:{bottom}:{left}:{right}"
         )
 
     def set_gap(self, relabs: str, gap: int) -> None:
-        """Set gap between windows on space to ``gap``. Parameter ``relabs``: one of {'rel', 'abs'}."""
+        """Set gap between windows on space to ``gap``. Parameter ``relabs`` is one of
+        {'rel', 'abs'}."""
         run_command(f"yabai -m space {self.space_sel} --gap {relabs}:{gap}")
 
     def toggle(self, what: str) -> None:
-        """Toggle setting on/off on space.
-        Parameter ``what``: one of {'padding', 'gap', 'mission-control', 'show-desktop'}.
-        """
+        """Toggle space setting. Parameter ``what`` is one of {'padding', 'gap',
+        'mission-control', 'show-desktop'}."""
         run_command(f"yabai -m space {self.space_sel} --toggle {what}")
 
     def set_layout(self, what: str) -> None:
-        """Set layout on space. Parameter ``what``: one of {'bsp', 'stack', 'float'}."""
+        """Set layout on space. Parameter ``what`` is one of {'bsp', 'stack', 'float'}."""
         run_command(f"yabai -m space {self.space_sel} --layout {what}")
 
     def set_label(self, label: str) -> None:
@@ -246,130 +283,3 @@ class Space:
         assert_label_allowed(label)
         run_command(f"yabai -m space {self.space_sel} --label {label}")
         self._label = label  # store because used as space_sel
-
-
-# @verify_space_sel
-# def focus(space_sel: Any) -> None:
-#     """Focus space ``space_sel``."""
-#     try:
-#         run_command(f"yabai -m space --focus {space_sel}")
-#     except ValueError as e:
-#         if "already focused space" not in e.args[0]:
-#             raise e
-#
-#
-# @verify_space_sel
-# def create(space_sel: Any) -> None:
-#     """Create space on same display as ``space_sel`` (use None for current space)."""
-#     run_command(f"yabai -m space --create {space_sel}")
-#
-#
-# @verify_space_sel
-# def destroy(space_sel: Any) -> None:
-#     """Destroy space ``space_sel`` (use None for current space)."""
-#     run_command(f"yabai -m space --destroy {space_sel}")
-#
-#
-# @verify_space_sel
-# def move_to_other(space_sel: Any, space_sel_target: Any) -> None:
-#     """Move space ``space_sel`` (use None for current space) to position of space
-#     ``space_sel_target`` (must be on same display)."""
-#     try:
-#         run_command(f"yabai -m space {space_sel} --move {space_sel_target}")
-#     except ValueError as e:
-#         if "cannot move space to itself" not in e.args[0]:
-#             raise e
-#
-#
-# @verify_space_sel
-# def swap_with_other(space_sel: Any, space_sel_target: Any) -> None:
-#     """Swap space ``space_sel`` (use None for current space) with space
-#     ``space_sel_target`` (must be on the same display)."""
-#     try:
-#         run_command(f"yabai -m space {space_sel} --swap {space_sel_target}")
-#     except ValueError as e:
-#         if "cannot swap space with itself" not in e.args[0]:
-#             raise e
-#
-#
-# @verify_space_sel
-# def send_to_display(space_sel: Any, display_sel: Any) -> None:
-#     """Send space ``space_sel`` (use None for current space) to display ``display_sel``."""
-#     try:
-#         run_command(f"yabai -m space {space_sel} --display {display_sel}")
-#     except ValueError as e:
-#         if "already located on the given display" not in e.args[0]:
-#             raise e
-#
-#
-# @verify_space_sel
-# def balance(space_sel: Any, axis: str = "xy") -> None:
-#     """Adjust split ratios on space ``space_sel`` (use None for current space) so that
-#     windows along given axis occupy same space. Parameter ``axis``: {'x', 'y', 'xy'}."""
-#     if "x" in axis and "y" in axis:
-#         arg = ""
-#     elif "x" in axis:
-#         arg = "x-axis"
-#     elif "y" in axis:
-#         arg = "y-axis"
-#     else:  # 'x' not in axis and 'y' not in axis:
-#         raise ValueError("Parameter ``axis`` must contain 'x', 'y', or both.")
-#     run_command(f"yabai -m space {space_sel} --balance {arg}")
-#
-#
-# @verify_space_sel
-# def mirror(space_sel: Any, axis: str = "x") -> None:
-#     """Flip the windows on space ``space_sel`` (use None for current space) along given
-#     axis. Parameter ``axis``: {'x', 'y'}."""
-#     if axis == "x":
-#         arg = "x-axis"
-#     elif axis == "y":
-#         arg = "y-axis"
-#     else:  # 'x' not in axis and 'y' not in axis:
-#         raise ValueError("Parameter ``axis`` must be 'x' or 'y'.")
-#     run_command(f"yabai -m space {space_sel} --mirror {arg}")
-#
-#
-# @verify_space_sel
-# def rotate(space_sel: Any, angle: int = 0) -> None:
-#     """Rotate the windows on space ``space_sel`` (use None for current space) through
-#     given angle in counterclockwise direction. Parameter ``angle``: {90, 180, 270}."""
-#     if angle == 0 or angle == 360:
-#         return
-#     run_command(f"yabai -m space {space_sel} --rotate {angle}")
-#
-#
-# @verify_space_sel
-# def set_padding(space_sel: Any, relabs: str, t: int, b: int, l: int, r: int) -> None:
-#     """Set padding around space ``space_sel`` (use None for current space). Parameter
-#     ``relabs``: one of {'rel', 'abs'}. Parameters ``t``, ``b``, ``l``, ``r``: top,
-#     bottom, left, right padding, respectively."""
-#     run_command(f"yabai -m space {space_sel} --padding {relabs}:{t}:{b}:{l}:{r}")
-#
-#
-# @verify_space_sel
-# def gap(space_sel: Any, relabs: str, gap: int) -> None:
-#     """Set gap between windows on space ``space_sel`` (use None for current space) to
-#     ``gap``. Parameter ``relabs``: one of {'rel', 'abs'}."""
-#     run_command(f"yabai -m space {space_sel} --gap {relabs}:{gap}")
-#
-#
-# @verify_space_sel
-# def toggle(space_sel: Any, what: str) -> None:
-#     """Toggle setting on/off on space ``space_sel`` (use None for current space).
-#     Parameter ``what``: one of {'padding', 'gap', 'mission-control', 'show-desktop'}."""
-#     run_command(f"yabai -m space {space_sel} --toggle {what}")
-#
-#
-# @verify_space_sel
-# def set_layout(space_sel: Any, what: str) -> None:
-#     """Set layout on space ``space_sel`` (use None for current space).
-#     Parameter ``what``: one of {'bsp', 'stack', 'float'}."""
-#     run_command(f"yabai -m space {space_sel} --layout {what}")
-#
-#
-# @verify_space_sel
-# def set_label(space_sel: Any, label: str) -> None:
-#     """Set label of space ``space_sel`` (use None for current space)."""
-#     assert_label_allowed(label)
-#     run_command(f"yabai -m space {space_sel} --label {label}")

@@ -1,8 +1,10 @@
-from typing import Callable, Any
+"""Shared functions."""
+
 import subprocess
 
 
-def run_command(command: str):
+def run_command(command: str) -> str:
+    """Run command in subprocess, returning the result if successful."""
     result = subprocess.run(
         command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )

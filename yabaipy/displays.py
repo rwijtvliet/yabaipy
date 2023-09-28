@@ -1,12 +1,15 @@
 """Module to manipulate displays."""
 
+# Specifying a space to yabai:
+# - Use the uuid to find the arrangement index, and use that.
+
 from __future__ import annotations
 from typing import Any, List, Dict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
 from .shared import run_command
+from . import spaces, windows
 import json
-from .spaces import Space
 
 
 def verify_display_selector(display_sel: str) -> Any:
@@ -36,6 +39,11 @@ def dictionaries() -> List[Dict[str, Any]]:
     return json.loads(run_command("yabai -m query --displays"))
 
 
+def get_all_displays() -> List[Display]:
+    """Create Display for all displays."""
+    return [Display(dic["index"]) for dic in dictionaries()]
+
+
 @dataclass_json
 @dataclass(frozen=True)
 class Props:
@@ -46,7 +54,7 @@ class Props:
     uuid: str
     index: int
     frame: Dict[str, float]
-    spaces: List[Space]
+    spaces: List[int]
 
     @classmethod
     def from_display_sel(cls, display_sel: Any) -> Props:
@@ -76,23 +84,45 @@ class Display:
         Use None for current display.
     """
 
-    @classmethod
-    def get_all(cls) -> List[Display]:
-        """Create Display for all displays."""
-        return [cls(dic["index"]) for dic in dictionaries()]
-
     def __init__(self, display_sel: str = None):
-        data = Props.from_display_sel(display_sel)
-        self._uuid: str = data.uuid  # cache uuid
+        props = Props.from_display_sel(display_sel)
+        self._uuid: str = props.uuid  # cache uuid
+
+    uuid: str = property(lambda self: self._uuid)
 
     @property
     def display_sel(self) -> str:
         """Currently-correct (unique) display selector with minimal queries."""
-        return dictionary_from_uuid(self._uuid)["index"]
+        return dictionary_from_uuid(self.uuid)["index"]
+
+    # ---
 
     def props(self) -> Props:
         """Query yabai API and return the current space properties."""
-        return Props.from_uuid(self._uuid)
+        return Props.from_uuid(self.uuid)
+
+    # ---
+
+    def __repr__(self) -> str:
+        return f"Display object with uuid '{self.uuid}'."
+
+    def __eq__(self, other: Any) -> bool:
+        return type(self) is type(other) and self.uuid == other.uuid
+
+    # ---
+
+    def get_spaces(self) -> List[spaces.Space]:
+        """Spaces on the display."""
+        space_idxs = self.props().spaces
+        return [spaces.Space(space_idx) for space_idx in space_idxs]
+
+    def get_windows(self) -> List[windows.Window]:
+        """Windows of the display."""
+        display_idx = self.props().index
+        wis = windows.get_all_windows()
+        return [wi for wi in wis if wi.props().display == display_idx]
+
+    # ---
 
     def focus(self) -> None:
         """Focus display."""

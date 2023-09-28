@@ -1,28 +1,15 @@
 """Module to manipulate windows."""
 
+# # Specifying a window to yabai:
+# - Use the window id.
+
 from __future__ import annotations
 from typing import Any, List, Dict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
 from .shared import run_command
 import json
-from .displays import Display
-
-
-# FORBIDDEN_LABELS = ["prev", "next", "first", "last", "recent", "mouse"]
-#
-#
-# def assert_label_allowed(label: str) -> None:
-#     """Raise ValueError if label is not allowed."""
-#     label = label.strip().lower()
-#     if not label:
-#         raise ValueError("Label forbidden; cannot be the emptystring.")
-#     if label in FORBIDDEN_LABELS:
-#         raise ValueError(f"Label '{label}' forbidden; reserved keyword.")
-#     if label.isdigit():
-#         raise ValueError(f"Label '{label}' forbidden; cannot be number.")
-#     if label in (dic["label"].lower() for dic in dictionaries()):
-#         raise ValueError(f"Label '{label}' forbidden; already exists.")
+from . import displays, spaces
 
 
 def verify_window_selector(window_sel: str) -> str:
@@ -41,15 +28,13 @@ def dictionary_from_window_sel(window_sel: str) -> Dict[str, Any]:
     return json.loads(run_command(f"yabai -m query --windows --window {window_sel}"))
 
 
-def dictionary_from_uuid(uuid: str) -> Dict[str, Any]:
-    for dic in dictionaries():
-        if dic["uuid"] == uuid:
-            return dic
-    raise ValueError(f"Cannot find window with uuid {uuid}.")
-
-
 def dictionaries() -> List[Dict[str, Any]]:
     return json.loads(run_command("yabai -m query --windows"))
+
+
+def get_all_windows() -> List[Window]:
+    """Create Window for all windows."""
+    return [Window(dic["id_"]) for dic in dictionaries()]
 
 
 @dataclass_json
@@ -94,10 +79,6 @@ class Props:
     def from_window_sel(cls, window_sel: str) -> Props:
         return cls.from_dict(dictionary_from_window_sel(window_sel))
 
-    @classmethod
-    def from_uuid(cls, uuid: str) -> Props:
-        return cls.from_dict(dictionary_from_uuid(uuid))
-
 
 class Window:
     """Class to manipulate windows. The properties are accessible via the `.props()`
@@ -122,51 +103,137 @@ class Window:
         Use None for current window.
     """
 
-    @classmethod
-    def get_all(cls) -> List[Window]:
-        """Create Space for all spaces."""
-        return [cls(dic["index"]) for dic in dictionaries()]
-
     def __init__(self, window_sel: str = None):
         data = Props.from_window_sel(window_sel)
-        self._label: str = data.label  # cache label
-        self._uud: str = data.uuid  # for backup: cache uuid
+        self._id: int = data.id_
+
+    id_: int = property(lambda self: self._id)
 
     @property
     def window_sel(self) -> str:
         """Currently-correct (unique) window selector with minimal queries."""
-        if self._uuid is None:
-            raise ValueError("This space has been destroyed.")
-        # Use label if possible (no queries needed)
-        if (label := self._label) != "":
-            return label
-        # Otherwise, use uuid to find index (slower)
-        return dictionary_from_uuid(self._uuid)["index"]
+        return self.id_
+
+    # ---
 
     def props(self) -> Props:
         """Query yabai API and return the current window properties."""
-        return Props.from_space_sel(self.space_sel)
+        return Props.from_window_sel(self.window_sel)
 
+    # ---
 
-#
-#     def focus(self) -> None:
-#         """Focus space."""
-#         try:
-#             run_command(f"yabai -m space --focus {self.space_sel}")
-#         except ValueError as e:
-#             if "already focused space" not in e.args[0]:
-#                 raise e
-#
-#     def create_here(self) -> Space:
-#         """Create new space on same display as this space; returning the created space."""
-#         display_sel = self.data().display
-#         run_command(f"yabai -m space --create {self.space_sel}")
-#         # new space is last one in this display; get mission-control index
-#         new_space_sel = Display(display_sel).spaces[-1]
-#         return Space(new_space_sel)
-#
-#     def destroy(self) -> None:
-#         """Destroy space."""
-#         run_command(f"yabai -m space --destroy {self.space_sel}")
-#         self._uuid = None
-#
+    def __repr__(self) -> str:
+        return f"Window object with id '{self.id_}'."
+
+    def __eq__(self, other: Any) -> bool:
+        return type(self) is type(other) and self.id_ == other.id_
+
+    # ---
+
+    def get_display(self) -> displays.Display:
+        """Display of the window."""
+        display_idx = self.props().display
+        return displays.Display(display_idx)
+
+    def get_space(self) -> spaces.Space:
+        """Space of the window."""
+        space_idx = self.props().space
+        return spaces.Space(space_idx)
+
+    # ---
+
+    def focus(self) -> None:
+        """Focus windows."""
+        try:
+            run_command(f"yabai -m window --focus {self.window_sel}")
+        except ValueError as e:
+            if "already focused window" not in e.args[0]:
+                raise e
+
+    def swap_with(self, window_sel: str) -> None:
+        """Swap window with window ``window_sel``."""
+        try:
+            run_command(f"yabai -m window {self.window_sel} --swap {window_sel}")
+        except ValueError as e:
+            if "cannot swap window with itself" not in e.args[0]:
+                raise e
+
+    def warp_onto(self, window_sel: str) -> None:
+        """Warp window onto window ``window_sel`` (i.e., re-insert the window, splitting
+        the given window)."""
+        run_command(f"yabai -m window {self.window_sel} --warp {window_sel}")
+
+    def stack_onto(self, window_sel: str) -> None:
+        """Stack window onto window ``window_sel``."""
+        run_command(f"yabai -m window {self.window_sel} --stack {window_sel}")
+
+    def set_insert_mode(self, mode: str) -> None:
+        """Set the splitting mode of the window. If current splitting mode matches the
+        selected mode, the action will be undone. Parameter ``mode``: {'north', 'south',
+        'east', 'west', 'stack'}."""
+        run_command(f"yabai -m window {self.window_sel} --insert {mode}")
+
+    def set_grid(
+        self, rows: int, cols: int, startx: int, starty: int, width: int, height: int
+    ) -> None:
+        """Set frame of window based on self-defined grid. Parameters ``startx`` and
+        ``starty`` are 1-indexed."""
+        run_command(
+            f"yabai -m window {self.window_sel} --grid {rows}:{cols}:{startx}:{starty}:{width}:{height}"
+        )
+
+    def move(self, relabs: str, dx: int, dy: int) -> None:
+        """Move window. If ``relabs``=='abs', ``dx`` and ``dy`` are new window position
+        in pixels. If ``relabs``=='rel', they are the change in the position."""
+        run_command(f"yabai -m window {self.window_sel} --move {relabs}:{dx}:{dy}")
+
+    def resize(self, handle: str, dx: int, dy: int) -> None:
+        """Resize window. If ``handle``=='abs', ``dx`` and ``dy`` are its new size in
+        pixels (not usable on managed windows). If ``handle`` is one of {'top', 'left',
+        'bottom', 'right', 'top_left', 'top_right', 'bottom_right', 'bottom_left'},
+        they are the distance the handle is moved by."""
+        run_command(f"yabai -m window {self.window_sel} --resize {handle}:{dx}:{dy}")
+
+    def set_ratio(self, relabs: str, dr: float) -> None:
+        """Set split ratio (when the window is split into two). If ``relabs``=='abs',
+        ``dr`` is the new split ratio. If ``relabs``=='rel', it is the change in the
+        split ratio (<0 to descrease size of left child)."""
+        run_command(f"yabai -m window {self.window_sel} --ratio {relabs}:{dr:0.3f}")
+
+    def toggle(self, what: str) -> None:
+        """Toggle window setting. Parameter ``what`` is one of {'float', 'sticky',
+        'topmost', 'pip', 'shadow', 'border', 'split', 'zoom-parent', 'zoom-fullscreen',
+        'native-fullscreen', 'expose'}. (SIP must be partially disabled for some.)"""
+        run_command(f"yabai -m window {self.window_sel} --toggle {what}")
+
+    def set_layer(self, layer: int) -> None:
+        """Set stacking layer of window. (SIP must be partially disabled.)"""
+        run_command(f"yabai -m window {self.window_sel} --layer {layer}")
+
+    def set_opacity(self, opacity: float) -> None:
+        """Set opacity of window. The window will no longer be eligible for automatic
+        change in opacity upon focus change. (Set to 0.0 to reset back to full opacity
+        OR have it be automatically managed through focus changes.) (SIP must be
+        partially disabled.)"""
+        run_command(f"yabai -m window {self.window_sel} --opacity {opacity:0.3f}")
+
+    def send_to_display(self, display_sel: str) -> None:
+        """Send window to display ``display_sel``."""
+        run_command(f"yabai -m window {self.window_sel} --display {display_sel}")
+
+    def send_to_space(self, space_sel: str) -> None:
+        """Send window to space ``space_sel``."""
+        run_command(f"yabai -m window {self.window_sel} --space {space_sel}")
+
+    def minimize(self) -> None:
+        """Minimize window. Only works on windows with minimize button in titlebar."""
+        run_command(f"yabai -m window --minimize {self.window_sel}")
+
+    def deminimize(self) -> None:
+        """Restore window if minimized. Window will only get focus if owning application
+        has focus. (Use .focus() method to restore as focused window.)"""
+        run_command(f"yabai -m window --deminimize {self.window_sel}")
+
+    def close(self) -> None:
+        """Close window. Only works on windows with close button in titlebar."""
+        run_command(f"yabai -m window --close {self.window_sel}")
