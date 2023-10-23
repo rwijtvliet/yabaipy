@@ -111,6 +111,13 @@ class Display:
 
     # ---
 
+    def create_here(self) -> spaces.Space:
+        """Create new space on display; returning the created space."""
+        run_command(f"yabai -m space --create {self.display_sel}")
+        # new space is last one in this display; get mission-control index
+        new_space_sel = self.props().spaces[-1]
+        return spaces.Space(new_space_sel)
+
     def get_spaces(self) -> List[spaces.Space]:
         """Spaces on the display."""
         space_idxs = self.props().spaces

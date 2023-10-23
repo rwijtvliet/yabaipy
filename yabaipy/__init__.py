@@ -5,8 +5,9 @@ from .spaces import Space, get_all_spaces
 from .displays import Display, get_all_displays
 from . import windows, spaces, displays
 from .additional import (
-    set_labelorder,
-    send_to_display_keep_order,
-    sort_spaces_on_display,
-    sort_spaces_on_displays,
+    send_space_to_display,
+    sort_display,
+    sort_displays,
+    assert_display_sorted,
+    assert_displays_sorted,
 )

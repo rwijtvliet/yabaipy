@@ -180,14 +180,6 @@ class Space:
             if "already focused space" not in e.args[0]:
                 raise e
 
-    def create_here(self) -> Space:
-        """Create new space on same display as this space; returning the created space."""
-        display_sel = self.props().display
-        run_command(f"yabai -m space --create {self.space_sel}")
-        # new space is last one in this display; get mission-control index
-        new_space_sel = displays.Display(display_sel).spaces[-1]
-        return Space(new_space_sel)
-
     def destroy(self) -> None:
         """Destroy space."""
         run_command(f"yabai -m space --destroy {self.space_sel}")
