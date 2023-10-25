@@ -18,7 +18,7 @@ The latter point is enforced when using the package whenever an unlabeled space 
 
 - When starting yabai, I cannot access the label a space previously had. I assign labels by looping through the spaces, but if they were in order `'1_files'`, `'3_terminal'`, `'2_www'`, they will be uncorrectly relabeled `'1_files'`, `'2_www'`, `'3_terminal'`. This issue is not solved by this package.
 
-- When moving a space to another display, the order is not always respected. If I move space `'2_www'` onto the same display as `'1_files'`, I want it to be inserted after `'one'`. This package solves that by adding a `sort_display()` function.
+- When moving a space to another display, the order is not always respected. If I move space `'2_www'` onto the same display as `'1_files'`, I want it to be inserted after `'1_files'`. This package solves that by adding a `sort_display()` function.
 
 - When moving/refocusing a space, the focus often moves to a different app or window. I currently suspect this is due to an issue with Microsoft Teams (which is what gets the focus), and am observing if quitting it resolves the issue. If not, this package can be used to get a reference to the active window before changing the space, and refocusing the window afterwards. This is not currently implemented.
 
