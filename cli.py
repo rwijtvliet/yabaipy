@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Command-line interface of the package."""
 
-import yabaipy as yp
+import yabpy as yp
 
 import argparse
 

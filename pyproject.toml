@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "yabaipy"
-version = "0.1.0"
+name = "yabpy"
+version = "0.2.0"
 description = ""
 authors = ["rwijtvliet <rwijtvliet@gmail.com>"]
 readme = "README.md"
