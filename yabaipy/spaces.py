@@ -17,13 +17,13 @@
 #   given a new label. This is done automatically when using the Space.set_label() method.
 
 from __future__ import annotations
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Iterable
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
 from .shared import run_command
 import json
 from . import displays, windows
-
+from .decorators import accept_space_instance, accept_display_instance
 
 FORBIDDEN_LABELS = ["prev", "next", "first", "last", "recent", "mouse"]
 
@@ -143,13 +143,13 @@ class Space:
         # Otherwise, use uuid to find index (slower)
         return dictionary_from_uuid(self._uuid)["index"]
 
-    # ---
+    # --- fetch properties
 
     def props(self) -> Props:
         """Query yabai API and return the current space properties."""
         return Props.from_space_sel(self.space_sel)
 
-    # ---
+    # --- dunder
 
     def __repr__(self) -> str:
         return f"Space object with uuid '{self._uuid}' and label '{self._label}'."
@@ -157,20 +157,7 @@ class Space:
     def __eq__(self, other: Any) -> bool:
         return type(self) is type(other) and self.uuid == other.uuid
 
-    # ---
-
-    def get_display(self) -> displays.Display:
-        """Display of the space."""
-        display_idx = self.props().display
-        return displays.Display(display_idx)
-
-    def get_windows(self) -> List[windows.Window]:
-        """Windows of the space."""
-        space_idx = self.props().index
-        wis = windows.get_all_windows()
-        return [wi for wi in wis if wi.props().space == space_idx]
-
-    # ---
+    # --- from yabai API
 
     def focus(self) -> None:
         """Focus space."""
@@ -185,6 +172,7 @@ class Space:
         run_command(f"yabai -m space --destroy {self.space_sel}")
         self._uuid = None
 
+    @accept_space_instance
     def move_to(self, space_sel: str) -> None:
         """Move space to position of space ``space_sel`` (must be on the same display)."""
         try:
@@ -195,6 +183,7 @@ class Space:
             else:
                 raise e
 
+    @accept_space_instance
     def swap_with(self, space_sel: str) -> None:
         """Swap space with space ``space_sel`` (must be on the same display)."""
         try:
@@ -205,6 +194,7 @@ class Space:
             else:
                 raise e
 
+    @accept_display_instance
     def send_to_display(self, display_sel: str) -> None:
         """Send space to display ``display_sel``."""
         try:
@@ -275,3 +265,23 @@ class Space:
         assert_label_allowed(label)
         run_command(f"yabai -m space {self.space_sel} --label {label}")
         self._label = label  # store because used as space_sel
+
+    # --- own additions
+
+    def get_display(self) -> displays.Display:
+        """Display of the space."""
+        display_idx = self.props().display
+        return displays.Display(display_idx)
+
+    def get_windows(self) -> List[windows.Window]:
+        """Windows of the space."""
+        space_idx = self.props().index
+        wis = windows.get_all_windows()
+        return [wi for wi in wis if wi.props().space == space_idx]
+
+
+def sort_spaces(spaces: Iterable[Space]) -> List[Space]:
+    """Sort specified list of Spaces in alphabetically sorted order. (Note: use
+    `Display.sort()` to do and also apply the sorting on a given display.)"""
+    # Sort by label (moving unlabeled spaces to end), and add uuid to make sorting unique.
+    return sorted(spaces, key=lambda sp: (sp.label or "zzzzzz", sp.uuid))

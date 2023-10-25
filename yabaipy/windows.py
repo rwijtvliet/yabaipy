@@ -10,6 +10,11 @@ from dataclasses_json import dataclass_json, config
 from .shared import run_command
 import json
 from . import displays, spaces
+from .decorators import (
+    accept_space_instance,
+    accept_window_instance,
+    accept_display_instance,
+)
 
 
 def verify_window_selector(window_sel: str) -> str:
@@ -114,13 +119,13 @@ class Window:
         """Currently-correct (unique) window selector with minimal queries."""
         return self.id_
 
-    # ---
+    # --- fetch properties
 
     def props(self) -> Props:
         """Query yabai API and return the current window properties."""
         return Props.from_window_sel(self.window_sel)
 
-    # ---
+    # --- dunder
 
     def __repr__(self) -> str:
         return f"Window object with id '{self.id_}'."
@@ -128,19 +133,7 @@ class Window:
     def __eq__(self, other: Any) -> bool:
         return type(self) is type(other) and self.id_ == other.id_
 
-    # ---
-
-    def get_display(self) -> displays.Display:
-        """Display of the window."""
-        display_idx = self.props().display
-        return displays.Display(display_idx)
-
-    def get_space(self) -> spaces.Space:
-        """Space of the window."""
-        space_idx = self.props().space
-        return spaces.Space(space_idx)
-
-    # ---
+    # --- from yabai API
 
     def focus(self) -> None:
         """Focus windows."""
@@ -150,6 +143,7 @@ class Window:
             if "already focused window" not in e.args[0]:
                 raise e
 
+    @accept_window_instance
     def swap_with(self, window_sel: str) -> None:
         """Swap window with window ``window_sel``."""
         try:
@@ -158,11 +152,13 @@ class Window:
             if "cannot swap window with itself" not in e.args[0]:
                 raise e
 
+    @accept_window_instance
     def warp_onto(self, window_sel: str) -> None:
         """Warp window onto window ``window_sel`` (i.e., re-insert the window, splitting
         the given window)."""
         run_command(f"yabai -m window {self.window_sel} --warp {window_sel}")
 
+    @accept_window_instance
     def stack_onto(self, window_sel: str) -> None:
         """Stack window onto window ``window_sel``."""
         run_command(f"yabai -m window {self.window_sel} --stack {window_sel}")
@@ -217,10 +213,12 @@ class Window:
         partially disabled.)"""
         run_command(f"yabai -m window {self.window_sel} --opacity {opacity:0.3f}")
 
+    @accept_display_instance
     def send_to_display(self, display_sel: str) -> None:
         """Send window to display ``display_sel``."""
         run_command(f"yabai -m window {self.window_sel} --display {display_sel}")
 
+    @accept_space_instance
     def send_to_space(self, space_sel: str) -> None:
         """Send window to space ``space_sel``."""
         run_command(f"yabai -m window {self.window_sel} --space {space_sel}")
@@ -237,3 +235,15 @@ class Window:
     def close(self) -> None:
         """Close window. Only works on windows with close button in titlebar."""
         run_command(f"yabai -m window --close {self.window_sel}")
+
+    # --- own additions
+
+    def get_display(self) -> displays.Display:
+        """Display of the window."""
+        display_idx = self.props().display
+        return displays.Display(display_idx)
+
+    def get_space(self) -> spaces.Space:
+        """Space of the window."""
+        space_idx = self.props().space
+        return spaces.Space(space_idx)

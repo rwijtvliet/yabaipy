@@ -95,13 +95,13 @@ class Display:
         """Currently-correct (unique) display selector with minimal queries."""
         return dictionary_from_uuid(self.uuid)["index"]
 
-    # ---
+    # --- fetch properties
 
     def props(self) -> Props:
         """Query yabai API and return the current space properties."""
         return Props.from_uuid(self.uuid)
 
-    # ---
+    # --- dunder
 
     def __repr__(self) -> str:
         return f"Display object with uuid '{self.uuid}'."
@@ -109,7 +109,13 @@ class Display:
     def __eq__(self, other: Any) -> bool:
         return type(self) is type(other) and self.uuid == other.uuid
 
-    # ---
+    # --- from yabai API
+
+    def focus(self) -> None:
+        """Focus display."""
+        run_command(f"yabai -m display --focus {self.display_sel}")
+
+    # --- own additions
 
     def create_here(self) -> spaces.Space:
         """Create new space on display; returning the created space."""
@@ -129,8 +135,18 @@ class Display:
         wis = windows.get_all_windows()
         return [wi for wi in wis if wi.props().display == display_idx]
 
-    # ---
-
-    def focus(self) -> None:
-        """Focus display."""
-        run_command(f"yabai -m display --focus {self.display_sel}")
+    def sort(self) -> None:
+        """Sort spaces on display in order of their labels."""
+        current = self.get_spaces()
+        sorted = spaces.sort_spaces(current)
+        # Apply order.
+        space_idx = self.props().spaces[0]
+        moved_any = False
+        for sp, sp_current in zip(sorted, current):
+            if moved_any or sp != sp_current:
+                print(
+                    f'Putting space "{sp.label}" at mission control index {space_idx}'
+                )
+                sp.move_to(space_idx)
+                moved_any = True
+            space_idx += 1
