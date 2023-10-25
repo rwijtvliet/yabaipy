@@ -34,6 +34,24 @@ The package defines classes `Window`, `Space`, and `Display`, which can be insta
 
 Other parts of the API, e.g. setting rules, are not currently implemented.
 
+## Usage
+
+```python
+import yabpy as yp
+
+sp = yp.Space('1_files')
+sp.send_to_display('west')
+sp.get_display().sort()
+```
+
+or, from the cli:
+
+```bash
+./cli.py send_to_display west
+```
+
+The cli exposes higher-level functionality only. Under the hood, the `send_to_display` command calls the `Space.send_to_display()` and the `Display.sort()` methods. For all cli commands, use `./cli.py --help`.
+
 ## Future work
 
 I'm not sure where I want to take this package. It was written out of necessity, but it is a bit overkill for my purposes, and changes in the `yabai` API mean that this will likely break in the future. Ideally - at least, for me ;) - the relevant functionality (in `/yabpy/additional.py`, mainly; some functionality also in the classes) is absorbed into yabai itself at some point.
