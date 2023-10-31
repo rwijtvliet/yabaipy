@@ -4,7 +4,7 @@ import dataclasses
 import json
 from typing import Dict
 import pathlib
-from .wrapper import Space
+from .spaces import Space
 
 SPACEDEFPATH = pathlib.Path(__file__).parent / "spaces.json"
 
