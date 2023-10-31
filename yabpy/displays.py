@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any, List, Dict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
-from .shared import run_command
+from .shared import run_bash
 from . import spaces, windows
 import json
 
@@ -25,7 +25,7 @@ def verify_display_selector(display_sel: str) -> Any:
 
 def dictionary_from_display_sel(display_sel: str) -> Dict[str, Any]:
     display_sel = verify_display_selector(display_sel)
-    return json.loads(run_command(f"yabai -m query --displays --display {display_sel}"))
+    return json.loads(run_bash(f"yabai -m query --displays --display {display_sel}"))
 
 
 def dictionary_from_uuid(uuid: str) -> Dict[str, Any]:
@@ -36,7 +36,7 @@ def dictionary_from_uuid(uuid: str) -> Dict[str, Any]:
 
 
 def dictionaries() -> List[Dict[str, Any]]:
-    return json.loads(run_command("yabai -m query --displays"))
+    return json.loads(run_bash("yabai -m query --displays"))
 
 
 def get_all_displays() -> List[Display]:
@@ -113,13 +113,13 @@ class Display:
 
     def focus(self) -> None:
         """Focus display."""
-        run_command(f"yabai -m display --focus {self.display_sel}")
+        run_bash(f"yabai -m display --focus {self.display_sel}")
 
     # --- own additions
 
     def create_here(self) -> spaces.Space:
         """Create new space on display; returning the created space."""
-        run_command(f"yabai -m space --create {self.display_sel}")
+        run_bash(f"yabai -m space --create {self.display_sel}")
         # new space is last one in this display; get mission-control index
         new_space_sel = self.props().spaces[-1]
         return spaces.Space(new_space_sel)

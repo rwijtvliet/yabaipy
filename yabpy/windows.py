@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any, List, Dict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json, config
-from .shared import run_command
+from .shared import run_bash
 import json
 from . import displays, spaces
 from .decorators import (
@@ -30,11 +30,11 @@ def verify_window_selector(window_sel: str) -> str:
 
 def dictionary_from_window_sel(window_sel: str) -> Dict[str, Any]:
     window_sel = verify_window_selector(window_sel)
-    return json.loads(run_command(f"yabai -m query --windows --window {window_sel}"))
+    return json.loads(run_bash(f"yabai -m query --windows --window {window_sel}"))
 
 
 def dictionaries() -> List[Dict[str, Any]]:
-    return json.loads(run_command("yabai -m query --windows"))
+    return json.loads(run_bash("yabai -m query --windows"))
 
 
 def get_all_windows() -> List[Window]:
@@ -138,7 +138,7 @@ class Window:
     def focus(self) -> None:
         """Focus windows."""
         try:
-            run_command(f"yabai -m window --focus {self.window_sel}")
+            run_bash(f"yabai -m window --focus {self.window_sel}")
         except ValueError as e:
             if "already focused window" not in e.args[0]:
                 raise e
@@ -147,7 +147,7 @@ class Window:
     def swap_with(self, window_sel: str) -> None:
         """Swap window with window ``window_sel``."""
         try:
-            run_command(f"yabai -m window {self.window_sel} --swap {window_sel}")
+            run_bash(f"yabai -m window {self.window_sel} --swap {window_sel}")
         except ValueError as e:
             if "cannot swap window with itself" not in e.args[0]:
                 raise e
@@ -156,85 +156,85 @@ class Window:
     def warp_onto(self, window_sel: str) -> None:
         """Warp window onto window ``window_sel`` (i.e., re-insert the window, splitting
         the given window)."""
-        run_command(f"yabai -m window {self.window_sel} --warp {window_sel}")
+        run_bash(f"yabai -m window {self.window_sel} --warp {window_sel}")
 
     @accept_window_instance
     def stack_onto(self, window_sel: str) -> None:
         """Stack window onto window ``window_sel``."""
-        run_command(f"yabai -m window {self.window_sel} --stack {window_sel}")
+        run_bash(f"yabai -m window {self.window_sel} --stack {window_sel}")
 
     def set_insert_mode(self, mode: str) -> None:
         """Set the splitting mode of the window. If current splitting mode matches the
         selected mode, the action will be undone. Parameter ``mode``: {'north', 'south',
         'east', 'west', 'stack'}."""
-        run_command(f"yabai -m window {self.window_sel} --insert {mode}")
+        run_bash(f"yabai -m window {self.window_sel} --insert {mode}")
 
     def set_grid(
         self, rows: int, cols: int, startx: int, starty: int, width: int, height: int
     ) -> None:
         """Set frame of window based on self-defined grid. Parameters ``startx`` and
         ``starty`` are 1-indexed."""
-        run_command(
+        run_bash(
             f"yabai -m window {self.window_sel} --grid {rows}:{cols}:{startx}:{starty}:{width}:{height}"
         )
 
     def move(self, relabs: str, dx: int, dy: int) -> None:
         """Move window. If ``relabs``=='abs', ``dx`` and ``dy`` are new window position
         in pixels. If ``relabs``=='rel', they are the change in the position."""
-        run_command(f"yabai -m window {self.window_sel} --move {relabs}:{dx}:{dy}")
+        run_bash(f"yabai -m window {self.window_sel} --move {relabs}:{dx}:{dy}")
 
     def resize(self, handle: str, dx: int, dy: int) -> None:
         """Resize window. If ``handle``=='abs', ``dx`` and ``dy`` are its new size in
         pixels (not usable on managed windows). If ``handle`` is one of {'top', 'left',
         'bottom', 'right', 'top_left', 'top_right', 'bottom_right', 'bottom_left'},
         they are the distance the handle is moved by."""
-        run_command(f"yabai -m window {self.window_sel} --resize {handle}:{dx}:{dy}")
+        run_bash(f"yabai -m window {self.window_sel} --resize {handle}:{dx}:{dy}")
 
     def set_ratio(self, relabs: str, dr: float) -> None:
         """Set split ratio (when the window is split into two). If ``relabs``=='abs',
         ``dr`` is the new split ratio. If ``relabs``=='rel', it is the change in the
         split ratio (<0 to descrease size of left child)."""
-        run_command(f"yabai -m window {self.window_sel} --ratio {relabs}:{dr:0.3f}")
+        run_bash(f"yabai -m window {self.window_sel} --ratio {relabs}:{dr:0.3f}")
 
     def toggle(self, what: str) -> None:
         """Toggle window setting. Parameter ``what`` is one of {'float', 'sticky',
         'topmost', 'pip', 'shadow', 'border', 'split', 'zoom-parent', 'zoom-fullscreen',
         'native-fullscreen', 'expose'}. (SIP must be partially disabled for some.)"""
-        run_command(f"yabai -m window {self.window_sel} --toggle {what}")
+        run_bash(f"yabai -m window {self.window_sel} --toggle {what}")
 
     def set_layer(self, layer: int) -> None:
         """Set stacking layer of window. (SIP must be partially disabled.)"""
-        run_command(f"yabai -m window {self.window_sel} --layer {layer}")
+        run_bash(f"yabai -m window {self.window_sel} --layer {layer}")
 
     def set_opacity(self, opacity: float) -> None:
         """Set opacity of window. The window will no longer be eligible for automatic
         change in opacity upon focus change. (Set to 0.0 to reset back to full opacity
         OR have it be automatically managed through focus changes.) (SIP must be
         partially disabled.)"""
-        run_command(f"yabai -m window {self.window_sel} --opacity {opacity:0.3f}")
+        run_bash(f"yabai -m window {self.window_sel} --opacity {opacity:0.3f}")
 
     @accept_display_instance
     def send_to_display(self, display_sel: str) -> None:
         """Send window to display ``display_sel``."""
-        run_command(f"yabai -m window {self.window_sel} --display {display_sel}")
+        run_bash(f"yabai -m window {self.window_sel} --display {display_sel}")
 
     @accept_space_instance
     def send_to_space(self, space_sel: str) -> None:
         """Send window to space ``space_sel``."""
-        run_command(f"yabai -m window {self.window_sel} --space {space_sel}")
+        run_bash(f"yabai -m window {self.window_sel} --space {space_sel}")
 
     def minimize(self) -> None:
         """Minimize window. Only works on windows with minimize button in titlebar."""
-        run_command(f"yabai -m window --minimize {self.window_sel}")
+        run_bash(f"yabai -m window --minimize {self.window_sel}")
 
     def deminimize(self) -> None:
         """Restore window if minimized. Window will only get focus if owning application
         has focus. (Use .focus() method to restore as focused window.)"""
-        run_command(f"yabai -m window --deminimize {self.window_sel}")
+        run_bash(f"yabai -m window --deminimize {self.window_sel}")
 
     def close(self) -> None:
         """Close window. Only works on windows with close button in titlebar."""
-        run_command(f"yabai -m window --close {self.window_sel}")
+        run_bash(f"yabai -m window --close {self.window_sel}")
 
     # --- own additions
 
