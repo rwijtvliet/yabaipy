@@ -55,3 +55,9 @@ def send_spaces_to_displays() -> None:
             if sd.display not in sps_per_display:  # correct display does not exist
                 continue
             sp.send_to_display(sd.display)
+
+
+def sort_displays() -> None:
+    """Sort spaces on all displays."""
+    for di in get_all_displays():
+        di.sort()

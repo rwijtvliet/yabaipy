@@ -91,7 +91,6 @@ def sort_display() -> None:
 def sort_displays() -> None:
     """Sort spaces on all displays."""
     # Do.
-    for di in get_all_displays():
-        di.sort()
+    additional.sort_displays()
     # Notify.
     notify("All displays", title="Sorting spaces")
