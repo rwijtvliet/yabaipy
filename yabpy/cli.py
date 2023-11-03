@@ -3,11 +3,10 @@
 import typer
 from .spaces import Space
 from .windows import Window
-from .displays import Display, get_all_displays
+from .displays import Display
 from .shared import notify, run_bash
-from .spacedef import fullname
+from .spacedef import fullname, get_all_spacedefs
 from . import additional
-
 
 app = typer.Typer()
 
@@ -94,3 +93,21 @@ def sort_displays() -> None:
     additional.sort_displays()
     # Notify.
     notify("All displays", title="Sorting spaces")
+
+
+# @app.command("get-spacedefs")
+# def get_spacedefs() -> None:
+#     """Return all space definitions."""
+#     print(get_all_spacedefs())
+#
+
+
+@app.command("space-prop")
+def space_prop(
+    prop_in: additional.SpaceProp, value: str, prop_out: additional.SpaceProp
+) -> None:
+    """Obtain property of a space, by specifying another property of it. The 'in-going'
+    information must be unique to the space."""
+    sp = additional.space_from_propery(prop_in, value)
+    prop = additional.property_of_space(sp, prop_out)
+    print(prop)

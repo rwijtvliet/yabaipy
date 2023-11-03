@@ -38,6 +38,10 @@ class SpaceDef:
         except KeyError:
             return cls("", "", "", "", "")
 
+    @property
+    def abbr(self) -> str:
+        return f"{self.key}{self.icon}"
+
     def fullname(self, include_icon: bool = True) -> str:
         icon = f"{self.icon} " if include_icon else ""
         return f"{self.key}: {icon}{self.name}"
