@@ -15,6 +15,8 @@ class SpaceProp(str, Enum):
     icon = "icon"
     abbr = "abbr"
     key = "key"
+    color = "color"  # as "#rrbbgg"
+    name = "name"
 
 
 def create_spaces() -> None:
@@ -78,8 +80,8 @@ def space_from_propery(prop: SpaceProp, value: str) -> Space:
     """Get space from some identifying property."""
     if prop in [SpaceProp.label, SpaceProp.index, SpaceProp.space_sel]:
         return Space(value)
-    elif prop in [SpaceProp.icon, SpaceProp.abbr, SpaceProp.key]:
-        attr = str(prop)
+    elif prop in [SpaceProp.icon, SpaceProp.abbr, SpaceProp.key, SpaceProp.color]:
+        attr = prop._value_
         for label, sd in get_all_spacedefs().items():
             if getattr(sd, attr) == value:
                 return Space(label)
@@ -104,14 +106,16 @@ def property_of_space(sp: Space, prop: SpaceProp) -> str:
         return sp.props().index
     elif prop == SpaceProp.display:
         return sp.props().display
-    # All remaining info comes from the corresponding space definition.
-    sd = get_all_spacedefs()[sp.label]
-    if prop == SpaceProp.icon:
-        return sd.icon
-    elif prop == SpaceProp.abbr:
-        return sd.abbr
-    elif prop == SpaceProp.key:
-        return sd.key
+    elif prop in [
+        SpaceProp.icon,
+        SpaceProp.abbr,
+        SpaceProp.key,
+        SpaceProp.color,
+        SpaceProp.name,
+    ]:
+        sd = get_all_spacedefs()[sp.label]
+        attr = prop._value_
+        return getattr(sd, attr)
     raise ValueError(
-        f"Unexpected value for ``prop``. Expected one of {SpaceProp}; got {prop}."
+        f"Unexpected value for parameter ``prop``. Expected one of {SpaceProp}; got {prop}."
     )

@@ -5,7 +5,7 @@ from .spaces import Space
 from .windows import Window
 from .displays import Display
 from .shared import notify, run_bash
-from .spacedef import fullname, get_all_spacedefs
+from .spacedef import fullname
 from . import additional
 
 app = typer.Typer()
@@ -108,6 +108,16 @@ def space_prop(
 ) -> None:
     """Obtain property of a space, by specifying another property of it. The 'in-going'
     information must be unique to the space."""
-    sp = additional.space_from_propery(prop_in, value)
-    prop = additional.property_of_space(sp, prop_out)
+    try:
+        sp = additional.space_from_propery(prop_in, value)
+    except Exception:
+        print(f"Could not find space with value '{value}' for property '{prop_in}'.")
+        return 1
+    try:
+        prop = additional.property_of_space(sp, prop_out)
+    except Exception:
+        print(
+            f"Could not get property {prop_out} for the selected space (with label '{sp.label}')."
+        )
+        return 1
     print(prop)
