@@ -3,63 +3,63 @@
     "key": "1",
     "name": "files",
     "icon": "",
-    "color": "#ff6a6a",
+    "color": "#ee7e80",
     "display": 1
   },
   "2_www": {
     "key": "2",
     "name": "www",
     "icon": "",
-    "color": "#ffaa6a",
+    "color": "#ec844b",
     "display": 1
   },
   "3_office": {
     "key": "3",
     "name": "office",
     "icon": "",
-    "color": "#ffea6a",
+    "color": "#4db18a",
     "display": 1
   },
   "4_terminal": {
     "key": "4",
     "name": "terminal",
     "icon": "",
-    "color": "#bfff6a",
+    "color": "#b89d4a",
     "display": 1
   },
   "5_vscode": {
     "key": "5",
     "name": "vscode",
     "icon": "󰨞",
-    "color": "#7fff6a",
+    "color": "#51adb6",
     "display": 1
   },
   "6_various": {
     "key": "6",
     "name": "various",
     "icon": "",
-    "color": "#6affaa",
+    "color": "#eb75cb",
     "display": 1
   },
   "7_teams": {
     "key": "7",
     "name": "teams",
     "icon": "󰭹",
-    "color": "#6affea",
+    "color": "#ab91ea",
     "display": 2
   },
   "8_email": {
     "key": "8",
     "name": "email",
     "icon": "󰇰",
-    "color": "#6abfff",
+    "color": "#55a7df",
     "display": 2
   },
   "9_media": {
     "key": "9",
     "name": "media",
     "icon": "󰎈",
-    "color": "#6a7fff",
+    "color": "#4ab44d",
     "display": 2
   }
 }

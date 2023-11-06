@@ -60,13 +60,18 @@ def send_spaces_to_displays() -> None:
     # NOTE: unhandled edge case: all spaces on first display must be moved.
     for di_index, sps in sps_per_display.items():
         for sp in sps:
+            print(f"Checking space {sp.label}...")
             sd = sds.get(sp.label)
             if sd is None:  # space not corresponding to a space definition
+                print("...unknown label; don't move.")
                 continue
             if sd.display == di_index:  # space is already on correct display
+                print("...already on correct display; don't move.")
                 continue
             if sd.display not in sps_per_display:  # correct display does not exist
+                print("...wanted display not available; don't move.")
                 continue
+            print(f"...sending to display {sd.display}")
             sp.send_to_display(sd.display)
 
 
