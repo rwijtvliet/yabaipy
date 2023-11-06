@@ -19,14 +19,11 @@ class SpaceDef:
 
     @classmethod
     def from_space(cls, sp: Space) -> SpaceDef:
-        for sd in get_all_spacedefs():
-            if sd.label == sp.label:
-                return sd
-        return cls("", "", "", "", "")
+        return cls.from_label(sp.label)
 
     @classmethod
     def from_key(cls, key: str) -> SpaceDef:
-        for sd in get_all_spacedefs():
+        for _, sd in get_all_spacedefs().items():
             if sd.key == key:
                 return sd
         return cls("", "", "", "", "")

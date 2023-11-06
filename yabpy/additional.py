@@ -87,9 +87,9 @@ def space_from_propery(prop: SpaceProp, value: str) -> Space:
                 return Space(label)
         raise ValueError(f"Couldn't find space definition where .{prop} equals {value}")
     elif prop == SpaceProp.display:
-        sps = Display(value).get_spaces()
+        sps = Display(value).props.spaces()
         if len(sps) == 1:
-            return sps[0]
+            return Space(sps[0])
         raise ValueError(
             "Can only identify space by its display, if display has exactly 1 space."
         )
@@ -113,9 +113,8 @@ def property_of_space(sp: Space, prop: SpaceProp) -> str:
         SpaceProp.color,
         SpaceProp.name,
     ]:
-        sd = get_all_spacedefs()[sp.label]
-        attr = prop._value_
-        return getattr(sd, attr)
+        sd = SpaceDef.from_space(sp)
+        return getattr(sd, prop._value_)
     raise ValueError(
         f"Unexpected value for parameter ``prop``. Expected one of {SpaceProp}; got {prop}."
     )
