@@ -1,10 +1,24 @@
 """Additional functionality."""
 
 from typing import List, Dict
+from .shared import run_osascript
 from .spaces import Space, get_all_spaces
 from .displays import Display, get_all_displays
 from .spacedef import SpaceDef, get_all_spacedefs
 from enum import Enum
+import pathlib
+
+KEYCODES_OF_NUMBERKEYS = {
+    "1": 18,
+    "2": 19,
+    "3": 20,
+    "4": 21,
+    "5": 23,
+    "6": 22,
+    "7": 26,
+    "8": 28,
+    "9": 25,
+}
 
 
 class SpaceProp(str, Enum):
@@ -17,6 +31,20 @@ class SpaceProp(str, Enum):
     key = "key"
     color = "color"  # as "#rrbbgg"
     name = "name"
+
+
+def focus_space_using_keypress(sp: Space) -> None:
+    """Instead of calling `yabai -m ...`, swtich to the correct space using the
+    shortcut keys ctrl+1 ... ctrl+9. Only works if shortcuts for space switching are
+    enabled."""
+    # Find index of space.
+    index = property_of_space(sp, SpaceProp.index)
+    # Find the keycode this number corresponds to.
+    keycode = KEYCODES_OF_NUMBERKEYS[str(index)]
+    # Press that key.
+    run_osascript(
+        f'tell application "System Events" to key code {keycode} using {{control down}}'
+    )
 
 
 def create_spaces() -> None:

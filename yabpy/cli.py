@@ -7,7 +7,7 @@ from typing_extensions import Annotated
 from .spaces import Space
 from .windows import Window
 from .displays import Display
-from .shared import notify, run_bash
+from .shared import notify, run_bash, run_osascript
 from .spacedef import fullname
 from . import additional
 
@@ -69,13 +69,57 @@ def prepare_spaces() -> int:
 
 
 @app.command("focus-space")
-def focus_space(space_sel: str) -> int:
-    """Focus space ``space_sel`` and notify user."""
+def focus_space(
+    space_sel: Annotated[
+        str,
+        typer.Argument(
+            help=(
+                "Something to identify the space with. Allowed values: LABEL | "
+                "mission-control index | prev | next | first | last | recent | mouse. "
+                "In addition, the shortcut key may be used, when the --key option is set."
+            )
+        ),
+    ],
+    key: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--key",
+            "-k",
+            help=(
+                "Indicates that the space_sel is a shortcut key. To avoid collision, "
+                "e.g. with the index of the space."
+            ),
+        ),
+    ] = False,
+    presses: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--presses",
+            "-p",
+            help=(
+                "Perform action using keypresses instead of yabai. Use when yabai (or"
+                "its scripting additions) does not work on the current macos version. "
+                "This is a less optimal solution; only use if necessary."
+                "Switching to spaces using control+number must be enabled."
+            ),
+        ),
+    ] = False,
+) -> int:
+    """Focus a space."""
     # Collect.
-    sp = Space(space_sel)
+    if not key:
+        maybe_print(f"Selecting space directly using {space_sel=}.")
+        sp = Space(space_sel)
+    else:
+        maybe_print(f"Selecting space from shortcut key {space_sel}.")
+        sp = additional.space_from_propery(additional.SpaceProp.key, space_sel)
     # Do.
-    maybe_print(f"Focusing space {space_sel}")
-    sp.focus()
+    if not presses:
+        maybe_print("Focusing space with yabai.")
+        sp.focus()
+    else:
+        maybe_print("Focusing space with by pressing control+number.")
+        additional.focus_space_using_keypress(sp)
     # Notify.
     maybe_notify(fullname(sp, False), title="Focusing")
     # Success.
@@ -83,14 +127,60 @@ def focus_space(space_sel: str) -> int:
 
 
 @app.command("window-to-space")
-def window_to_space(space_sel: str) -> int:
-    """Move current window to space ``space_sel`` and notify user."""
+def window_to_space(
+    space_sel: Annotated[
+        str,
+        typer.Argument(
+            help=(
+                "Something to identify the space with. Allowed values: LABEL | "
+                "mission-control index | prev | next | first | last | recent | mouse. "
+                "In addition, the shortcut key may be used, when the --key option is set."
+            )
+        ),
+    ],
+    key: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--key",
+            "-k",
+            help=(
+                "Indicates that the space_sel is a shortcut key. To avoid collision, "
+                "e.g. with the index of the space."
+            ),
+        ),
+    ] = False,
+    presses: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--presses",
+            "-p",
+            help=(
+                "Perform action using keypresses instead of yabai. Use when yabai (or"
+                "its scripting additions) does not work on the current macos version. "
+                "This is a less optimal solution; only use if necessary."
+            ),
+        ),
+    ] = False,
+) -> int:
+    """Move current window to another space."""
     # Collect.
-    wi, sp = Window(), Space(space_sel)
+    wi = Window()
+    if not key:
+        maybe_print(f"Selecting space directly using {space_sel=}.")
+        sp = Space(space_sel)
+    else:
+        maybe_print(f"Selecting space from shortcut key {space_sel}.")
+        sp = additional.space_from_propery(additional.SpaceProp.key, space_sel)
     # Do.
-    maybe_print(f"Moving current window to space {space_sel}")
-    wi.send_to_space(sp)
-    sp.focus()
+    if not presses:
+        maybe_print("Moving window with yabai.")
+        wi.send_to_space(sp)
+        sp.focus()
+    else:
+        print(
+            "Cannot send window to space using keypresses; mac does not have a shortcut key for it."
+        )
+        return 1
     # Notify.
     maybe_notify(fullname(sp, False), title="Moving window to")
     # Trigger sketchybar.
@@ -107,7 +197,7 @@ def space_to_display(display_sel: str) -> int:
     di = Display(display_sel)  # target display
     # Check.
     if len(sp.get_display().props().spaces) == 1:
-        maybe_print("Cannot move this space; it's the last space on its display.")
+        print("Cannot move this space; it's the last space on its display.")
         return 1
     # Do.
     maybe_print(f"Sending current space to display {display_sel}")
