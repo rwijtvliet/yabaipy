@@ -2,14 +2,125 @@
 
 import typer
 import functools
-from typing import Optional
+import os
+import sys
+from typing import Optional, Tuple, Callable
 from typing_extensions import Annotated
 from .spaces import Space
 from .windows import Window
 from .displays import Display
-from .shared import notify, run_bash, run_osascript
+from .shared import notify, run_bash
 from .spacedef import fullname
 from . import additional
+
+
+# Custom Types
+
+CliResult = Tuple[int, str]
+SpaceSel = Annotated[
+    str,
+    typer.Argument(
+        help=(
+            "Something to identify the space with. Allowed values: LABEL | "
+            "mission-control index | prev | next | first | last | recent | mouse. "
+            "In addition, the shortcut key may be used, when the --key option is set."
+        )
+    ),
+]
+DisplaySel = Annotated[
+    str,
+    typer.Argument(
+        help=(
+            "Something to identify the display with. Allowed values: arrangement index | "
+            "prev | next | first | last | recent | mouse | north | east | west | south."
+        )
+    ),
+]
+Key = Annotated[
+    Optional[bool],
+    typer.Option(
+        "--key",
+        "-k",
+        help=(
+            "Indicates that the space_sel is a shortcut key. To avoid collision, "
+            "e.g. with the index of the space."
+        ),
+    ),
+]
+Presses = Annotated[
+    Optional[bool],
+    typer.Option(
+        "--presses",
+        "-p",
+        help=(
+            "Perform action using keypresses instead of yabai. Use when yabai (or "
+            "its scripting additions) does not work on the current macos version. "
+            "This is a less optimal solution; only use if necessary."
+            "Switching to spaces using control+number must be enabled."
+        ),
+    ),
+]
+Sketchybar = Annotated[
+    Optional[str],
+    typer.Option(
+        "--sketchy",
+        "-s",
+        help=(
+            "Comma-seperated list (without spaces) of sketchybar events to trigger after "
+            "performing the action. (By calling `sketchybar --trigger ...`)."
+        ),
+    ),
+]
+
+
+# General functions
+
+
+def trigger(sketchybar: str = "") -> None:
+    """Trigger sketchybar events."""
+    if sketchybar == "":
+        return
+    events = sketchybar.replace(",", " ")
+    print(f"Triggering sketchybar events: {events}")
+    run_bash(f"sketchybar --trigger {events}")
+
+
+@functools.wraps(notify)
+def maybe_notify(*args, **kwargs):
+    if state["notify"]:
+        notify(*args, **kwargs)
+
+
+class PrintIfVerbose:
+    def __enter__(self):
+        if state["verbose"]:
+            self._original_stdout = None
+        else:
+            self._original_stdout = sys.stdout
+            sys.stdout = open(os.devnull, "w")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._original_stdout is not None:
+            sys.stdout.close()
+            sys.stdout = self._original_stdout
+
+
+def handle_verboseness_and_cliresult(fn: Callable[[...], CliResult]):
+    """Suppress all print statements unless verbose wanted. Print message and return ok
+    or nok value."""
+
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs) -> int:
+        with PrintIfVerbose():
+            nok, msg = fn(*args, **kwargs)
+        print(msg)
+        return nok
+
+    return wrapped
+
+
+# Run app
+
 
 app = typer.Typer()
 state = {}
@@ -40,249 +151,181 @@ def main():
     app()
 
 
-def maybe_print(msg: str):
-    if state["verbose"]:
-        print(msg)
-
-
-@functools.wraps(notify)
-def maybe_notify(*args, **kwargs):
-    if state["notify"]:
-        notify(*args, **kwargs)
-
-
 @app.command("prepare-spaces")
-def prepare_spaces() -> int:
+@handle_verboseness_and_cliresult
+def prepare_spaces(sketchybar: Sketchybar = "") -> CliResult:
     """Create/delete/move spaces, so that all desired spaces exist, on the display of
     choice, in the order of their labels."""
     # Do.
-    maybe_print("Creating spaces")
+    print("Creating spaces")
     additional.create_spaces()
-    maybe_print("Sending spaces to displays")
+    print("Sending spaces to displays")
     additional.send_spaces_to_displays()
-    maybe_print("Sorting displays")
+    print("Sorting displays")
     additional.sort_displays()
-    # Notify.
+    # Notify and trigger.
     maybe_notify("Preparing spaces", title="Yabpy")
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "Spaces have been prepared"
 
 
 @app.command("focus-space")
+@handle_verboseness_and_cliresult
 def focus_space(
-    space_sel: Annotated[
-        str,
-        typer.Argument(
-            help=(
-                "Something to identify the space with. Allowed values: LABEL | "
-                "mission-control index | prev | next | first | last | recent | mouse. "
-                "In addition, the shortcut key may be used, when the --key option is set."
-            )
-        ),
-    ],
-    key: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--key",
-            "-k",
-            help=(
-                "Indicates that the space_sel is a shortcut key. To avoid collision, "
-                "e.g. with the index of the space."
-            ),
-        ),
-    ] = False,
-    presses: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--presses",
-            "-p",
-            help=(
-                "Perform action using keypresses instead of yabai. Use when yabai (or"
-                "its scripting additions) does not work on the current macos version. "
-                "This is a less optimal solution; only use if necessary."
-                "Switching to spaces using control+number must be enabled."
-            ),
-        ),
-    ] = False,
-) -> int:
+    space_sel: SpaceSel,
+    key: Key = False,
+    presses: Presses = False,
+    sketchybar: Sketchybar = "",
+) -> CliResult:
     """Focus a space."""
     # Collect.
     if not key:
-        maybe_print(f"Selecting space directly using {space_sel=}.")
+        print(f"Selecting space directly using {space_sel=}.")
         sp = Space(space_sel)
     else:
-        maybe_print(f"Selecting space from shortcut key {space_sel}.")
+        print(f"Selecting space from shortcut key {space_sel}.")
         sp = additional.space_from_propery(additional.SpaceProp.key, space_sel)
     # Do.
     if not presses:
-        maybe_print("Focusing space with yabai.")
+        print("Focusing space with yabai.")
         sp.focus()
     else:
-        maybe_print("Focusing space with by pressing control+number.")
+        print("Focusing space with by pressing control+number.")
         additional.focus_space_using_keypress(sp)
-    # Notify.
+    # Notify and trigger.
     maybe_notify(fullname(sp, False), title="Focusing")
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "Space has been focused"
 
 
 @app.command("window-to-space")
+@handle_verboseness_and_cliresult
 def window_to_space(
-    space_sel: Annotated[
-        str,
-        typer.Argument(
-            help=(
-                "Something to identify the space with. Allowed values: LABEL | "
-                "mission-control index | prev | next | first | last | recent | mouse. "
-                "In addition, the shortcut key may be used, when the --key option is set."
-            )
-        ),
-    ],
-    key: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--key",
-            "-k",
-            help=(
-                "Indicates that the space_sel is a shortcut key. To avoid collision, "
-                "e.g. with the index of the space."
-            ),
-        ),
-    ] = False,
-    presses: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--presses",
-            "-p",
-            help=(
-                "Perform action using keypresses instead of yabai. Use when yabai (or"
-                "its scripting additions) does not work on the current macos version. "
-                "This is a less optimal solution; only use if necessary."
-            ),
-        ),
-    ] = False,
-) -> int:
+    space_sel: SpaceSel,
+    key: Key = False,
+    presses: Presses = False,
+    sketchybar: Sketchybar = "",
+) -> CliResult:
     """Move current window to another space."""
     # Collect.
     wi = Window()
     if not key:
-        maybe_print(f"Selecting space directly using {space_sel=}.")
+        print(f"Selecting space directly using {space_sel=}.")
         sp = Space(space_sel)
     else:
-        maybe_print(f"Selecting space from shortcut key {space_sel}.")
+        print(f"Selecting space from shortcut key {space_sel}.")
         sp = additional.space_from_propery(additional.SpaceProp.key, space_sel)
     # Do.
     if not presses:
-        maybe_print("Moving window with yabai.")
+        print("Moving window with yabai.")
         wi.send_to_space(sp)
         sp.focus()
     else:
-        print(
-            "Cannot send window to space using keypresses; mac does not have a shortcut key for it."
+        return (
+            1,
+            "Cannot send window to space using keypresses; mac does not have a shortcut key for it.",
         )
-        return 1
-    # Notify.
+    # Notify and trigger.
     maybe_notify(fullname(sp, False), title="Moving window to")
-    # Trigger sketchybar.
-    run_bash("sketchybar --trigger windows_on_spaces")
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "Window has been moved to space"
 
 
 @app.command("space-to-display")
-def space_to_display(display_sel: str) -> int:
+@handle_verboseness_and_cliresult
+def space_to_display(display_sel: DisplaySel, sketchybar: Sketchybar = "") -> CliResult:
     """Send current space to display ``display_sel``, while keeping them in order
     (according to their label), and then focus the space."""
     sp = Space()
     di = Display(display_sel)  # target display
     # Check.
     if len(sp.get_display().props().spaces) == 1:
-        print("Cannot move this space; it's the last space on its display.")
-        return 1
+        return 1, "Cannot move this space; it's the last space on its display."
     # Do.
-    maybe_print(f"Sending current space to display {display_sel}")
+    print(f"Sending current space to display {display_sel}")
     sp.send_to_display(di)
-    maybe_print("Sorting display")
+    print("Sorting display")
     di.sort()
-    maybe_print("Focussing display")
+    print("Focussing display")
     di.focus()
-    # Notify.
+    # Notify and trigger.
     maybe_notify(
         f"{fullname(sp, False)} to display {di.props().index}", title="Moving space"
     )
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "Space has been moved to display"
 
 
 @app.command("spaces-to-displays")
-def spaces_to_displays() -> int:
+@handle_verboseness_and_cliresult
+def spaces_to_displays(sketchybar: Sketchybar = "") -> CliResult:
     """Send all spaces to their preferred displays (if possible) and order the spaces
     (according to their label)."""
     # Do.
-    maybe_print("Sending spaces to displays")
+    print("Sending spaces to displays")
     additional.send_spaces_to_displays()
-    maybe_print("Sorting displays")
+    print("Sorting displays")
     additional.sort_displays()
-    # Notify.
+    # Notify and trigger.
     maybe_notify("All spaces to their preferred displays", title="Moving spaces")
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "All spaces have been mowved to displays"
 
 
 @app.command("sort-display")
-def sort_display() -> int:
+@handle_verboseness_and_cliresult
+def sort_display(sketchybar: Sketchybar = "") -> CliResult:
     """Sort spaces on current display (according to their label)."""
     # Do.
-    maybe_print("Sorting current display")
+    print("Sorting current display")
     Display().sort()
-    # Notify.
+    # Notify and trigger.
     maybe_notify("Current display", title="Sorting spaces")
+    trigger(sketchybar)
     # Success.
-    return 0
+    return 0, "Current display has been sorted"
 
 
 @app.command("sort-displays")
-def sort_displays() -> int:
+@handle_verboseness_and_cliresult
+def sort_displays(sketchybar: Sketchybar = "") -> CliResult:
     """Sort spaces on all displays (accoring to their label)."""
     # Do.
-    maybe_print("Sorting displays")
+    print("Sorting displays")
     additional.sort_displays()
-    # Notify.
+    # Notify and trigger.
     maybe_notify("All displays", title="Sorting spaces")
+    trigger(sketchybar)
     # Success.
-    return 0
-
-
-# @app.command("get-spacedefs")
-# def get_spacedefs() -> int:
-#     """Return all space definitions."""
-#     print(get_all_spacedefs())
-#
+    return 0, "Displays have been sorted"
 
 
 @app.command("space-prop")
+@handle_verboseness_and_cliresult
 def space_prop(
     prop_in: additional.SpaceProp, value: str, prop_out: additional.SpaceProp
-) -> int:
+) -> CliResult:
     """Obtain property of a space, by specifying another property of it. The 'in-going'
     information must be unique to the space."""
     try:
         sp = additional.space_from_propery(prop_in, value)
     except Exception:
-        maybe_print(
+        print(
             f"Could not find (exactly 1) space with value '{value}' for property '{prop_in}'."
         )
-        print(value)
-        return 1
+        return 1, value
 
     try:
         prop = additional.property_of_space(sp, prop_out)
     except Exception:
-        maybe_print(
+        print(
             f"Could not get property {prop_out} for the selected space (with label '{sp.label}')."
         )
-        print(sp.label)  # fallback value
-        return 1
+        return 1, sp.label  # fallback value
 
-    print(prop)
-    return 0
+    return 0, prop

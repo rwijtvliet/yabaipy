@@ -6,7 +6,6 @@ from .spaces import Space, get_all_spaces
 from .displays import Display, get_all_displays
 from .spacedef import SpaceDef, get_all_spacedefs
 from enum import Enum
-import pathlib
 
 KEYCODES_OF_NUMBERKEYS = {
     "1": 18,
@@ -34,7 +33,7 @@ class SpaceProp(str, Enum):
 
 
 def focus_space_using_keypress(sp: Space) -> None:
-    """Instead of calling `yabai -m ...`, swtich to the correct space using the
+    """Instead of calling `yabai -m ...`, switch to the correct space using the
     shortcut keys ctrl+1 ... ctrl+9. Only works if shortcuts for space switching are
     enabled."""
     # Find index of space.
@@ -58,23 +57,28 @@ def create_spaces() -> None:
     labels_found = [sp.label for sp in sps if sp.label in sds]
     # . spaces that are found but not wanted
     sps_excess = [sp for sp in sps if sp.label not in labels_found]
+    print(f". Found but not wanted: {[sp.label for sp in sps_excess]}")
     # . spaces that are wanted but not found
     sds_excess = {label: sd for label, sd in sds.items() if label not in labels_found}
+    print(f". Wanted but not found: {sds_excess.keys()}")
 
     # Rename excess spaces to other wanted spacedef.
     incommon = min(len(sps_excess), len(sds_excess))
     for _ in range(incommon):
         sp = sps_excess.pop()
         label, sd = sds_excess.popitem()
+        print(f".. Renaming space to {label}")
         sp.set_label(label)
 
     # Now, we either have excess spaces left, which must get deleted...
     for sp in sps_excess:
+        print(f".. Destroying excess space with label {sp.label}.")
         sp.destroy()
 
     # ...or we have spacedefs left, for which a space must be created. (or, neither)
     di = Display(1)
     for label, sd in sds_excess.items():
+        print(f".. Creating missing space, with label {label}")
         di.create_here().set_label(label)
 
 
@@ -88,18 +92,19 @@ def send_spaces_to_displays() -> None:
     # NOTE: unhandled edge case: all spaces on first display must be moved.
     for di_index, sps in sps_per_display.items():
         for sp in sps:
-            print(f"Checking space {sp.label}...")
             sd = sds.get(sp.label)
             if sd is None:  # space not corresponding to a space definition
-                print("...unknown label; don't move.")
+                print(f". Space with unknown label {sp.label}; don't move.")
                 continue
             if sd.display == di_index:  # space is already on correct display
-                print("...already on correct display; don't move.")
+                print(f". Space {sp.label} already on correct display; don't move.")
                 continue
             if sd.display not in sps_per_display:  # correct display does not exist
-                print("...wanted display not available; don't move.")
+                print(
+                    f". For space {sp.label}, wanted display ({sd.display}) is unavailable; don't move."
+                )
                 continue
-            print(f"...sending to display {sd.display}")
+            print(f". Space {sp.label} is sent to display {sd.display}")
             sp.send_to_display(sd.display)
 
 

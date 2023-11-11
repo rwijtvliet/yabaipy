@@ -145,7 +145,7 @@ class Display:
         for sp, sp_current in zip(sorted, current):
             if moved_any or sp != sp_current:
                 print(
-                    f'Putting space "{sp.label}" at mission control index {space_idx}'
+                    f'. Putting space "{sp.label}" at mission control index {space_idx}'
                 )
                 sp.move_to(space_idx)
                 moved_any = True
