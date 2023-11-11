@@ -9,7 +9,7 @@ from typing_extensions import Annotated
 from .spaces import Space
 from .windows import Window
 from .displays import Display
-from .shared import notify, run_bash
+from .shared import notify
 from .spacedef import fullname
 from . import additional
 
@@ -106,6 +106,10 @@ app = typer.Typer()
 state = {}
 
 
+def main():
+    app()
+
+
 @app.callback()
 def globl(
     verbose: Annotated[
@@ -125,10 +129,6 @@ def globl(
     obtain a property."""
     state["verbose"] = verbose
     state["notify"] = notify
-
-
-def main():
-    app()
 
 
 @app.command("prepare-spaces")

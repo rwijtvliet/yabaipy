@@ -66,7 +66,6 @@ class Props:
     can_resize: bool = field(metadata=config(field_name="can-resize"))
     has_focus: bool = field(metadata=config(field_name="has-focus"))
     has_shadow: bool = field(metadata=config(field_name="has-shadow"))
-    has_border: bool = field(metadata=config(field_name="has-border"))
     has_parent_zoom: bool = field(metadata=config(field_name="has-parent-zoom"))
     has_fullscreen_zoom: bool = field(metadata=config(field_name="has-fullscreen-zoom"))
     is_native_fullscreen: bool = field(
@@ -77,7 +76,6 @@ class Props:
     is_hidden: bool = field(metadata=config(field_name="is-hidden"))
     is_floating: bool = field(metadata=config(field_name="is-floating"))
     is_sticky: bool = field(metadata=config(field_name="is-sticky"))
-    is_topmost: bool = field(metadata=config(field_name="is-topmost"))
     is_grabbed: bool = field(metadata=config(field_name="is-grabbed"))
 
     @classmethod
