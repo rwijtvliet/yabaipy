@@ -60,29 +60,9 @@ Presses = Annotated[
         ),
     ),
 ]
-Sketchybar = Annotated[
-    Optional[str],
-    typer.Option(
-        "--sketchy",
-        "-s",
-        help=(
-            "Comma-seperated list (without spaces) of sketchybar events to trigger after "
-            "performing the action. (By calling `sketchybar --trigger ...`)."
-        ),
-    ),
-]
 
 
 # General functions
-
-
-def trigger(sketchybar: str = "") -> None:
-    """Trigger sketchybar events."""
-    if sketchybar == "":
-        return
-    events = sketchybar.replace(",", " ")
-    print(f"Triggering sketchybar events: {events}")
-    run_bash(f"sketchybar --trigger {events}")
 
 
 @functools.wraps(notify)
@@ -153,7 +133,7 @@ def main():
 
 @app.command("prepare-spaces")
 @handle_verboseness_and_cliresult
-def prepare_spaces(sketchybar: Sketchybar = "") -> CliResult:
+def prepare_spaces() -> CliResult:
     """Create/delete/move spaces, so that all desired spaces exist, on the display of
     choice, in the order of their labels."""
     # Do.
@@ -163,9 +143,8 @@ def prepare_spaces(sketchybar: Sketchybar = "") -> CliResult:
     additional.send_spaces_to_displays()
     print("Sorting displays")
     additional.sort_displays()
-    # Notify and trigger.
+    # Notify.
     maybe_notify("Preparing spaces", title="Yabpy")
-    trigger(sketchybar)
     # Success.
     return 0, "Spaces have been prepared"
 
@@ -173,10 +152,7 @@ def prepare_spaces(sketchybar: Sketchybar = "") -> CliResult:
 @app.command("focus-space")
 @handle_verboseness_and_cliresult
 def focus_space(
-    space_sel: SpaceSel,
-    key: Key = False,
-    presses: Presses = False,
-    sketchybar: Sketchybar = "",
+    space_sel: SpaceSel, key: Key = False, presses: Presses = False
 ) -> CliResult:
     """Focus a space."""
     # Collect.
@@ -193,9 +169,8 @@ def focus_space(
     else:
         print("Focusing space with by pressing control+number.")
         additional.focus_space_using_keypress(sp)
-    # Notify and trigger.
+    # Notify.
     maybe_notify(fullname(sp, False), title="Focusing")
-    trigger(sketchybar)
     # Success.
     return 0, "Space has been focused"
 
@@ -203,10 +178,7 @@ def focus_space(
 @app.command("window-to-space")
 @handle_verboseness_and_cliresult
 def window_to_space(
-    space_sel: SpaceSel,
-    key: Key = False,
-    presses: Presses = False,
-    sketchybar: Sketchybar = "",
+    space_sel: SpaceSel, key: Key = False, presses: Presses = False
 ) -> CliResult:
     """Move current window to another space."""
     # Collect.
@@ -227,16 +199,15 @@ def window_to_space(
             1,
             "Cannot send window to space using keypresses; mac does not have a shortcut key for it.",
         )
-    # Notify and trigger.
+    # Notify.
     maybe_notify(fullname(sp, False), title="Moving window to")
-    trigger(sketchybar)
     # Success.
     return 0, "Window has been moved to space"
 
 
 @app.command("space-to-display")
 @handle_verboseness_and_cliresult
-def space_to_display(display_sel: DisplaySel, sketchybar: Sketchybar = "") -> CliResult:
+def space_to_display(display_sel: DisplaySel) -> CliResult:
     """Send current space to display ``display_sel``, while keeping them in order
     (according to their label), and then focus the space."""
     sp = Space()
@@ -251,18 +222,17 @@ def space_to_display(display_sel: DisplaySel, sketchybar: Sketchybar = "") -> Cl
     di.sort()
     print("Focussing display")
     di.focus()
-    # Notify and trigger.
+    # Notify.
     maybe_notify(
         f"{fullname(sp, False)} to display {di.props().index}", title="Moving space"
     )
-    trigger(sketchybar)
     # Success.
     return 0, "Space has been moved to display"
 
 
 @app.command("spaces-to-displays")
 @handle_verboseness_and_cliresult
-def spaces_to_displays(sketchybar: Sketchybar = "") -> CliResult:
+def spaces_to_displays() -> CliResult:
     """Send all spaces to their preferred displays (if possible) and order the spaces
     (according to their label)."""
     # Do.
@@ -270,37 +240,34 @@ def spaces_to_displays(sketchybar: Sketchybar = "") -> CliResult:
     additional.send_spaces_to_displays()
     print("Sorting displays")
     additional.sort_displays()
-    # Notify and trigger.
+    # Notify.
     maybe_notify("All spaces to their preferred displays", title="Moving spaces")
-    trigger(sketchybar)
     # Success.
     return 0, "All spaces have been mowved to displays"
 
 
 @app.command("sort-display")
 @handle_verboseness_and_cliresult
-def sort_display(sketchybar: Sketchybar = "") -> CliResult:
+def sort_display() -> CliResult:
     """Sort spaces on current display (according to their label)."""
     # Do.
     print("Sorting current display")
     Display().sort()
-    # Notify and trigger.
+    # Notify.
     maybe_notify("Current display", title="Sorting spaces")
-    trigger(sketchybar)
     # Success.
     return 0, "Current display has been sorted"
 
 
 @app.command("sort-displays")
 @handle_verboseness_and_cliresult
-def sort_displays(sketchybar: Sketchybar = "") -> CliResult:
+def sort_displays() -> CliResult:
     """Sort spaces on all displays (accoring to their label)."""
     # Do.
     print("Sorting displays")
     additional.sort_displays()
-    # Notify and trigger.
+    # Notify.
     maybe_notify("All displays", title="Sorting spaces")
-    trigger(sketchybar)
     # Success.
     return 0, "Displays have been sorted"
 
