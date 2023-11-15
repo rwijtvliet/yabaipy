@@ -131,6 +131,23 @@ def globl(
     state["notify"] = notify
 
 
+@app.command("create-spaces")
+@handle_verboseness_and_cliresult
+def create_spaces() -> CliResult:
+    """Create/delete spaces, so that all desired spaces exist, in the order of their
+    labels. To also move the spaces to their preferred display, use ``prepare-spaces``
+    instead."""
+    # Do.
+    print("Creating spaces")
+    additional.create_spaces()
+    print("Sorting displays")
+    additional.sort_displays()
+    # Notify.
+    maybe_notify("Creating spaces", title="Yabpy")
+    # Success.
+    return 0, "Spaces have been created"
+
+
 @app.command("prepare-spaces")
 @handle_verboseness_and_cliresult
 def prepare_spaces() -> CliResult:
